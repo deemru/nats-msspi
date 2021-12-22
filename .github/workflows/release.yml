@@ -1,0 +1,98 @@
+name: Release
+on: push
+
+env:
+  golang-version: '1.16.12'
+  gomsspi-version: 'v1.16.12-msspi'
+  nats-server-version: 'v2.6.6'
+  nats-streaming-server-version: 'v0.23.2'
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - os: windows-latest
+          platform: win64
+          aext: zip
+        - os: ubuntu-latest
+          platform: linux
+          aext: tgz
+        - os: macos-latest
+          platform: darwin
+          aext: tgz
+
+    name: Setup
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.golang-version }}
+
+    - name: Setup CryptoPro/go
+      env:
+        PROJECTTAG: ${{ env.gomsspi-version }}
+      shell: bash
+      run: |
+        cd $RUNNER_TEMP
+        git -c advice.detachedHead=false clone --depth 1 --branch ${PROJECTTAG} https://github.com/CryptoPro/go.git
+        cd go
+        git submodule update --init --recursive --depth 1
+        cd src/go-msspi/msspi/build_linux
+        make -B static
+        if [ "$RUNNER_OS" != "Windows" ]; then
+          make -B static-capix
+        fi
+        cp -rf $RUNNER_TEMP/go/src $GOROOT
+
+    - name: Build nats-server
+      env:
+        PROJECTNAME: 'nats-server'
+        PROJECTTAG: ${{ env.nats-server-version }}
+        PLATFORM: ${{ matrix.platform }}
+        AEXT: ${{ matrix.aext }}
+      shell: bash
+      run: |
+        git -c advice.detachedHead=false clone --depth 1 --branch ${PROJECTTAG} https://github.com/nats-io/${PROJECTNAME}.git
+        cd ${PROJECTNAME}
+        go build -v
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}.exe
+        elif [ "$RUNNER_OS" == "Linux" ]; then
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+        else
+          exit 1
+        fi
+
+    - name: Build nats-streaming-server
+      env:
+        PROJECTNAME: 'nats-streaming-server'
+        PROJECTTAG: ${{ env.nats-streaming-server-version }}
+        PLATFORM: ${{ matrix.platform }}
+        AEXT: ${{ matrix.aext }}
+      shell: bash
+      run: |
+        git -c advice.detachedHead=false clone --depth 1 --branch ${PROJECTTAG} https://github.com/nats-io/${PROJECTNAME}.git
+        cd ${PROJECTNAME}
+        go build -v
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}.exe
+        elif [ "$RUNNER_OS" == "Linux" ]; then
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+        else
+          exit 1
+        fi
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: |
+          nats-server/nats-server_${{ env.nats-server-version }}_${{ matrix.platform }}.${{ matrix.aext }}
+          nats-streaming-server/nats-streaming-server_${{ env.nats-streaming-server-version }}_${{ matrix.platform }}.${{ matrix.aext }}
