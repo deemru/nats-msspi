@@ -2,10 +2,10 @@ name: Release
 on: push
 
 env:
-  golang-version: '1.16.15'
-  go-cpro-version: 'v1.16.15-msspi-2'
-  nats-server-version: 'v2.7.4'
-  nats-streaming-server-version: 'v0.24.3'
+  golang-version: '1.18.3'
+  go-cpro-version: 'v1.18.3-msspi'
+  nats-server-version: 'v2.8.4'
+  nats-streaming-server-version: 'v0.24.6'
 
 jobs:
   test:
