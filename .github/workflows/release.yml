@@ -23,6 +23,9 @@ jobs:
         - os: macos-latest
           platform: darwin
           aext: tgz
+        - os: debian-9
+          platform: linux-glibc-2.24
+          aext: tgz
 
     name: Setup
     steps:
