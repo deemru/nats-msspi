@@ -23,18 +23,21 @@ jobs:
         - os: macos-latest
           platform: darwin
           aext: tgz
-        - os: debian-9
+        - os: ubuntu-latest
           platform: linux-glibc-2.24
           aext: tgz
+          legacy: debian9
 
     name: Setup
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
+      if: ${{ matrix.legacy != 'debian9' }}
       with:
         go-version: ${{ env.golang-version }}
 
     - name: Setup CryptoPro/go
+      if: ${{ matrix.legacy != 'debian9' }}
       env:
         PROJECTTAG: ${{ env.go-cpro-version }}
       shell: bash
@@ -50,7 +53,96 @@ jobs:
         fi
         cp -rf $RUNNER_TEMP/go/src $GOROOT
 
+    - name: Build legacy Debian 9 image
+      if: ${{ matrix.legacy == 'debian9' }}
+      shell: bash
+      run: |
+        docker build \
+          --build-arg GO_VERSION=${{ env.golang-version }} \
+          -t nats-msspi-debian9-go:${{ env.golang-version }} \
+          - <<'EOF'
+        FROM debian:9
+
+        ARG GO_VERSION=1.22.12
+
+        RUN printf '%s\n' \
+              'deb http://archive.debian.org/debian stretch main' \
+              'deb http://archive.debian.org/debian-security stretch/updates main' \
+              > /etc/apt/sources.list \
+         && apt-get update -o Acquire::Check-Valid-Until=false \
+         && apt-get install -y --no-install-recommends \
+              ca-certificates \
+              curl \
+              g++ \
+              gcc \
+              git \
+              gzip \
+              make \
+              tar \
+              xz-utils \
+         && rm -rf /var/lib/apt/lists/*
+
+        RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz \
+         && tar -C /usr/local -xzf /tmp/go.tgz \
+         && rm /tmp/go.tgz
+
+        ENV PATH="/usr/local/go/bin:${PATH}"
+        ENV CGO_ENABLED=1
+
+        WORKDIR /work
+        EOF
+
+    - name: Build legacy linux-glibc-2.24 packages
+      if: ${{ matrix.legacy == 'debian9' }}
+      env:
+        GO_CPRO_VERSION: ${{ env.go-cpro-version }}
+        NATS_SERVER_VERSION: ${{ env.nats-server-version }}
+        NATS_STREAMING_SERVER_VERSION: ${{ env.nats-streaming-server-version }}
+        PLATFORM: ${{ matrix.platform }}
+        AEXT: ${{ matrix.aext }}
+      shell: bash
+      run: |
+        docker run --rm \
+          -e GO_CPRO_VERSION \
+          -e NATS_SERVER_VERSION \
+          -e NATS_STREAMING_SERVER_VERSION \
+          -e PLATFORM \
+          -e AEXT \
+          -v "$PWD:/work" \
+          -w /work \
+          nats-msspi-debian9-go:${{ env.golang-version }} \
+          bash -lc '
+            set -euo pipefail
+
+            cd /tmp
+            git -c advice.detachedHead=false clone --depth 1 --branch "${GO_CPRO_VERSION}" https://github.com/CryptoPro/go.git
+            cd go
+            git submodule update --init --recursive --depth 1
+            cd src/go-msspi/msspi/build_linux
+            make -B static
+            make -B static-capix
+            cp -rf /tmp/go/src /usr/local/go
+
+            build_project() {
+              local owner="$1"
+              local project="$2"
+              local tag="$3"
+
+              cd /work
+              git -c advice.detachedHead=false clone --depth 1 --branch "${tag}" "https://github.com/${owner}/${project}.git"
+              cd "${project}"
+              go build -v
+              go build -v -gcflags="all=-N -l" -o "${project}_debug"
+              tar -zcvf "${project}_${tag}_${PLATFORM}.${AEXT}" "./${project}"
+              tar -zcvf "${project}_${tag}_${PLATFORM}_debug.${AEXT}" "./${project}_debug"
+            }
+
+            build_project nats-io nats-server "${NATS_SERVER_VERSION}"
+            build_project CryptoPro nats-streaming-server "${NATS_STREAMING_SERVER_VERSION}"
+          '
+
     - name: Build nats-server
+      if: ${{ matrix.legacy != 'debian9' }}
       env:
         PROJECTNAME: 'nats-server'
         PROJECTTAG: ${{ env.nats-server-version }}
@@ -80,6 +172,7 @@ jobs:
         fi
 
     - name: Build nats-streaming-server
+      if: ${{ matrix.legacy != 'debian9' }}
       env:
         PROJECTNAME: 'nats-streaming-server'
         PROJECTTAG: ${{ env.nats-streaming-server-version }}
