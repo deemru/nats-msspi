@@ -111,8 +111,9 @@ jobs:
           -v "$PWD:/work" \
           -w /work \
           nats-msspi-debian9-go:${{ env.golang-version }} \
-          bash -lc '
+          bash -c '
             set -euo pipefail
+            export PATH="/usr/local/go/bin:${PATH}"
 
             cd /tmp
             git -c advice.detachedHead=false clone --depth 1 --branch "${GO_CPRO_VERSION}" https://github.com/CryptoPro/go.git
