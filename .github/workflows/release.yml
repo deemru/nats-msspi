@@ -62,11 +62,19 @@ jobs:
         cd ${PROJECTNAME}
         go build -v
         if [ "$RUNNER_OS" == "Windows" ]; then
+          go build -v -gcflags="all=-N -l" -o ${PROJECTNAME}_debug.exe
+        else
+          go build -v -gcflags="all=-N -l" -o ${PROJECTNAME}_debug
+        fi
+        if [ "$RUNNER_OS" == "Windows" ]; then
           7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}.exe
+          7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug.exe
         elif [ "$RUNNER_OS" == "Linux" ]; then
           tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug
         elif [ "$RUNNER_OS" == "macOS" ]; then
           tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug
         else
           exit 1
         fi
@@ -83,11 +91,19 @@ jobs:
         cd ${PROJECTNAME}
         go build -v
         if [ "$RUNNER_OS" == "Windows" ]; then
+          go build -v -gcflags="all=-N -l" -o ${PROJECTNAME}_debug.exe
+        else
+          go build -v -gcflags="all=-N -l" -o ${PROJECTNAME}_debug
+        fi
+        if [ "$RUNNER_OS" == "Windows" ]; then
           7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}.exe
+          7z a -mm=Deflate -mfb=258 -mpass=15 -r ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug.exe
         elif [ "$RUNNER_OS" == "Linux" ]; then
           tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug
         elif [ "$RUNNER_OS" == "macOS" ]; then
           tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}.${AEXT} ./${PROJECTNAME}
+          tar -zcvf ${PROJECTNAME}_${PROJECTTAG}_${PLATFORM}_debug.${AEXT} ./${PROJECTNAME}_debug
         else
           exit 1
         fi
@@ -98,4 +114,6 @@ jobs:
       with:
         files: |
           nats-server/nats-server_${{ env.nats-server-version }}_${{ matrix.platform }}.${{ matrix.aext }}
+          nats-server/nats-server_${{ env.nats-server-version }}_${{ matrix.platform }}_debug.${{ matrix.aext }}
           nats-streaming-server/nats-streaming-server_${{ env.nats-streaming-server-version }}_${{ matrix.platform }}.${{ matrix.aext }}
+          nats-streaming-server/nats-streaming-server_${{ env.nats-streaming-server-version }}_${{ matrix.platform }}_debug.${{ matrix.aext }}
